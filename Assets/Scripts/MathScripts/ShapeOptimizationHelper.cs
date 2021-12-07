@@ -18,14 +18,15 @@ namespace Collider2DOptimization
 
 			Int32 firstPoint = 0;
 			Int32 lastPoint = Points.Count - 1;
-			List<Int32> pointIndexsToKeep = new List<Int32>();
+            List<Int32> pointIndexsToKeep = new List<Int32>
+            {
+                //Add the first and last index to the keepers
+                firstPoint,
+                lastPoint
+            };
 
-			//Add the first and last index to the keepers
-			pointIndexsToKeep.Add(firstPoint);
-			pointIndexsToKeep.Add(lastPoint);
-
-			//The first and the last point cannot be the same
-			while (Points[firstPoint].Equals(Points[lastPoint]))
+            //The first and the last point cannot be the same
+            while (Points[firstPoint].Equals(Points[lastPoint]))
 			{
 				lastPoint--;
 			}

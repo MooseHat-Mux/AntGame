@@ -15,6 +15,8 @@ public class AntMovementData : ScriptableObject
     public int AngularStep;
 
     [Header("Transition Settings")]
+    public float centerPosXOffset;
+    public float targetPosYOffset;
     public float transitionSpeed;
     public float maxVertOffset;
     public AnimationCurve transitionTween;

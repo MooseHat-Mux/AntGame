@@ -13,12 +13,14 @@ MonoBehaviour:
   m_Name: AntLegGroup2
   m_EditorClassIdentifier: 
   minDistance: 0
-  maxDistance: 0.41
-  targetDefaultPos: {x: 0.01, y: -0.03}
-  RayDistance: 0.32
+  maxDistance: 0.48
+  targetDefaultPos: {x: 0.08, y: -0.43}
+  RayDistance: 0.43
   AngularStep: 10
-  transitionSpeed: 7
-  maxVertOffset: 0.54
+  centerPosXOffset: -0.11
+  targetPosYOffset: 0.005
+  transitionSpeed: 3.35
+  maxVertOffset: 2.67
   transitionTween:
     serializedVersion: 2
     m_Curve:
@@ -47,8 +49,8 @@ MonoBehaviour:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
-      time: 0
-      value: 0
+      time: 0.00000008614734
+      value: 0.020774573
       inSlope: 3.1713274
       outSlope: 3.1713274
       tangentMode: 0
@@ -56,17 +58,17 @@ MonoBehaviour:
       inWeight: 0
       outWeight: 0.062388748
     - serializedVersion: 3
-      time: 0.5015336
-      value: 1.0017598
-      inSlope: 0.07877768
-      outSlope: 0.07877768
+      time: 0.5026243
+      value: 15.080215
+      inSlope: -0.021170363
+      outSlope: -0.021170363
       tangentMode: 0
       weightedMode: 0
       inWeight: 0.33333334
-      outWeight: 0.1353687
+      outWeight: 0.13387826
     - serializedVersion: 3
-      time: 1.0012817
-      value: 0.002357483
+      time: 1.0003077
+      value: 0.004970193
       inSlope: -3.4433506
       outSlope: -3.4433506
       tangentMode: 0

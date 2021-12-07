@@ -120,10 +120,10 @@ public class AntBrain : MonoBehaviour
             headLookTarget.rotation = Quaternion.Euler(new Vector3(0, 0, angle));
         }
 
-        int groupLength = locomotionController.limbGroups.Length;
+        int groupLength = locomotionController.limbGroups[0].limbTargets.Length;
         for (int i = 0; i < groupLength; i++)
         {
-            locomotionController.limbGroups[i].localScale = flip;
+            locomotionController.limbTargets[locomotionController.limbGroups[0].limbTargets[i]].Center.transform.localScale = flip;
         }
 
         spriteAnim.transform.localScale = flip;
@@ -159,10 +159,10 @@ public class AntBrain : MonoBehaviour
         spriteAnim.transform.localScale = flip;
 
         flip.x *= -1;
-        int groupLength = locomotionController.limbGroups.Length;
+        int groupLength = locomotionController.limbGroups[0].limbTargets.Length;
         for (int i = 0; i < groupLength; i++)
         {
-            locomotionController.limbGroups[i].localScale = flip;
+            locomotionController.limbTargets[locomotionController.limbGroups[0].limbTargets[i]].Center.transform.localScale = flip;
         }
     }
 

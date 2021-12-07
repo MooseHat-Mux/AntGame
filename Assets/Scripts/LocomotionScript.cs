@@ -6,22 +6,20 @@ public class LocomotionScript : MonoBehaviour
 {
     [Header("Limb Settings")]
     public float targetAccuracy;
-    public float legAngleModifier;
     public float resetTargetDistance;
+    public float arcDetectionLength;
     public LayerMask groundLayerMask;
 
     [Header("Limb References")]
     public AntBrain antController;
     public Transform bodyCenter;
-    public Transform[] limbGroups;
+    public LimbGroup[] limbGroups;
     public LimbScript[] limbTargets;
 
-    [Header("Movement Data")]
-    public AntMovementData[] thisMovementData;
-
     private int limbCount;
-    private Vector2[] newPosTargets;
+    private Vector2[] newPosTargets = new Vector2[6];
     private RaycastHit2D[] results = new RaycastHit2D[2];
+    private int currentLimbGroup;
 
     private void Start()
     {
@@ -29,92 +27,22 @@ public class LocomotionScript : MonoBehaviour
         newPosTargets = new Vector2[limbCount];
     }
 
-    // Update is called once per frame
-    void Update()
+    void FixedUpdate()
     {
-        if (limbCount > 0)
+        if (antController.dir.magnitude > 0)
         {
-            for (int i = 0; i < limbCount; i++)
+            if (limbCount > 0)
             {
-                UpdateLimb(i);
+                for (int i = 0; i < limbCount; i++)
+                {
+                    UpdateLimb(i);
+                }
             }
         }
     }
 
     private void UpdateLimb(int limbIndex)
     {
-        // Calculating distance to IK target
-        float dist = Vector2.Distance(limbTargets[limbIndex].transform.position, limbTargets[limbIndex].Center.position);
-
-        if (dist > resetTargetDistance)
-        {
-            ResetTargetPos();
-        }
-
-        // Compare it with min and max limits
-        if (dist >= thisMovementData[limbIndex].maxDistance || dist < thisMovementData[limbIndex].minDistance)
-        {
-            // If the target is out of range find new point and take a step
-            newPosTargets[limbIndex] = GetNewTargetPosition(limbIndex);
-            //limbTargets[limbIndex].transform.position = GetNewTargetPosition(limbIndex);
-
-            if (!limbTargets[limbIndex].moving)
-            {
-                limbTargets[limbIndex].moving = true;
-                StartCoroutine(MovetargetToNewPosition(limbIndex));
-            }
-        }
-    }
-
-    private IEnumerator MovetargetToNewPosition(int limbIndex)
-    {
-        float limbTimer = 0;
-        while (true)
-        {
-            limbTimer += Time.deltaTime;
-            if (limbTimer > 1)
-            {
-                limbTimer = 0;
-            }
-
-            //Rotate tip of limb to point towards target
-            Vector3 rotDir = (newPosTargets[limbIndex] - (Vector2)limbTargets[limbIndex].LimbTip.position).normalized;
-            Vector2 redDir = (rotDir - limbTargets[limbIndex].transform.right).normalized;
-            float angle = Mathf.Atan2(redDir.y, redDir.x) * Mathf.Rad2Deg + legAngleModifier;
-            limbTargets[limbIndex].transform.rotation = Quaternion.Euler(new Vector3(0, 0, angle));
-
-            //Find direction to move target
-            Vector3 dir = (newPosTargets[limbIndex] - (Vector2)limbTargets[limbIndex].transform.position).normalized;
-
-            float vertOffset = thisMovementData[limbIndex].transitionVerticalOffset.Evaluate(limbTimer);
-            if (vertOffset <= thisMovementData[limbIndex].maxVertOffset)
-            {
-                dir.y += vertOffset;
-            }
-
-            limbTargets[limbIndex].transform.position += thisMovementData[limbIndex].transitionSpeed * Time.deltaTime * dir;
-
-            float currentDist = Vector2.Distance(limbTargets[limbIndex].transform.position, newPosTargets[limbIndex]);
-            if (currentDist <= targetAccuracy)
-            {
-                break;
-            }
-
-            yield return new WaitForEndOfFrame();
-        };
-
-        limbTargets[limbIndex].moving = false;
-    }
-
-    private Vector2 GetNewTargetPosition(int limbIndex)
-    {
-        AntMovementData thisData = thisMovementData[limbIndex];
-
-        // Assign default target position as new position
-        Vector2 _newTargetPosition = limbTargets[limbIndex].Center.TransformPoint(thisData.targetDefaultPos);
-        // Determine start and end point for LineCast
-        var linecastStartPos = limbTargets[limbIndex].Center.up * thisData.RayDistance;
-        // Rotate end point to specified angle around root
         int direction = -1;
 
         if (antController.dir.x < 0)
@@ -122,8 +50,75 @@ public class LocomotionScript : MonoBehaviour
             direction = 1;
         }
 
+        AntMovementData thisMovementData = limbGroups[currentLimbGroup].movementData;
+
+        Vector3 centerPos = limbTargets[limbIndex].Center.position + new Vector3(thisMovementData.centerPosXOffset * direction, 0);
+
+        // Calculating distance to IK target
+        float dist = Vector2.Distance(limbTargets[limbIndex].transform.position, centerPos);
+
+        if (dist > resetTargetDistance)
+        {
+            limbTargets[limbIndex].moving = false;
+            ResetTargetPos();
+        }
+
+        // Compare it with min and max limits
+        if (dist >= thisMovementData.maxDistance || dist < thisMovementData.minDistance)
+        {
+            // If the target is out of range find new point and take a step
+            newPosTargets[limbIndex] = GetNewTargetPosition(limbIndex);
+            //limbTargets[limbIndex].transform.position = GetNewTargetPosition(limbIndex);
+
+            int moveFinished = 1;
+            int targetCount = limbGroups[currentLimbGroup].limbTargets.Length;
+            for (int i = 0; i < targetCount; i++)
+            {
+                if (!limbTargets[limbIndex].moving)
+                {
+                    limbTargets[limbIndex].moving = true;
+                    StartCoroutine(MovetargetToNewPosition(limbIndex));
+
+                    moveFinished++;
+                }
+            }
+
+            if (moveFinished >= targetCount)
+            {
+                currentLimbGroup++;
+
+                if (currentLimbGroup >= limbGroups.Length)
+                {
+                    currentLimbGroup = 0;
+                }
+            }
+        }
+    }
+
+    private Vector2 GetNewTargetPosition(int limbIndex)
+    {
+        AntMovementData thisData = limbGroups[currentLimbGroup].movementData;
+
+        int direction = -1;
+
+        if (antController.dir.x < 0)
+        {
+            direction = 1;
+        }
+
+        Vector3 center = limbTargets[limbIndex].Center.up;
+        center.x += thisData.centerPosXOffset * direction;
+
+        // Assign default target position as new position
+        Vector2 _newTargetPosition = limbTargets[limbIndex].Center.TransformPoint(thisData.targetDefaultPos);
+        // Determine start and end point for LineCast
+        var linecastStartPos = center * thisData.RayDistance;
+        // Rotate end point to specified angle around root
+
+
         var rot = Quaternion.AngleAxis(direction * thisData.AngularStep, transform.forward);
-        var steps = Mathf.CeilToInt(180 / Mathf.Abs(thisData.AngularStep));
+        var steps = Mathf.CeilToInt(arcDetectionLength / Mathf.Abs(thisData.AngularStep));
+
 
         // Looping through LineCasts until it finds any point
         for (int i = 0; i < steps; i++)
@@ -136,9 +131,19 @@ public class LocomotionScript : MonoBehaviour
                 results, groundLayerMask) > 0)
             {
                 // Point found, exiting function
-                _newTargetPosition = results[0].point;
+                if (results[0].point.y > results[1].point.y)
+                {
+                    _newTargetPosition = results[0].point;
+                }
+                else
+                {
+                    _newTargetPosition = results[1].point;
+                }
+
+                _newTargetPosition.y += thisData.targetPosYOffset;
                 return _newTargetPosition;
             }
+
             linecastStartPos = linecastEndPos;
         }
 
@@ -148,68 +153,116 @@ public class LocomotionScript : MonoBehaviour
         return _newTargetPosition;
     }
 
+    private IEnumerator MovetargetToNewPosition(int limbIndex)
+    {
+        AntMovementData thisData = limbGroups[currentLimbGroup].movementData;
+        float totalDist = Vector2.Distance(newPosTargets[limbIndex], limbTargets[limbIndex].transform.position);
+        float time = totalDist / thisData.transitionSpeed;
+        float limbTimer = 0;
+        while (limbTargets[limbIndex].moving)
+        {
+
+            //Find direction to move target
+            Vector3 dir = (newPosTargets[limbIndex] - (Vector2)limbTargets[limbIndex].transform.position).normalized;
+
+            limbTimer += Time.deltaTime * time;
+
+            float vertOffset = thisData.transitionVerticalOffset.Evaluate(limbTimer);
+            limbTimer += limbTimer;
+
+            if (vertOffset < thisData.maxVertOffset)
+            {
+                dir.y += vertOffset;
+            }
+
+            limbTargets[limbIndex].transform.position += thisData.transitionSpeed * Time.deltaTime * dir;
+
+            float currentDist = Vector2.Distance(limbTargets[limbIndex].transform.position, newPosTargets[limbIndex]);
+            if (currentDist <= targetAccuracy)
+            {
+                limbTargets[limbIndex].moving = false;
+            }
+
+            yield return new WaitForEndOfFrame();
+        };
+
+    }
+
     public void ResetTargetPos()
     {
-        if (limbCount > 0)
+        int limbGroupCount = limbGroups.Length;
+
+        if (limbGroupCount > 0)
         {
-            for (int i = 0; i < limbCount; i++)
+            for (int i = 0; i < limbGroupCount; i++)
             {
-                limbTargets[i].transform.position = limbTargets[i].Center.TransformPoint(thisMovementData[i].targetDefaultPos);
+                int thisLimbCount = limbGroups[i].limbTargets.Length;
+
+                if (thisLimbCount > 0)
+                {
+                    for (int j = 0; j < limbCount; j++)
+                    {
+                        limbTargets[j].transform.position = limbTargets[j].Center.TransformPoint(limbGroups[i].movementData.targetDefaultPos);
+                    }
+                }
             }
         }
     }
 
     private void OnDrawGizmos()
     {
-        limbCount = thisMovementData.Length;
+        int limbGroupCount = limbGroups.Length;
 
-        if (limbCount > 0)
+        if (limbGroupCount > 0)
         {
-            for (int i = 0; i < limbCount; i++)
+            for (int i = 0; i < limbGroupCount; i++)
             {
-                AntMovementData thisData = thisMovementData[i];
-                
-                // Assign default target position as new position
-                Vector2 _newTargetPosition = bodyCenter.TransformPoint(thisData.targetDefaultPos);
-
-                // Determine start and end point for LineCast
-                var linecastStartPos = limbTargets[i].Center.up * thisData.RayDistance;
-
-                int direction = -1;
-
-                if (antController.dir.x < 0)
+                int thisLimbCount = limbGroups[i].limbTargets.Length;
+                for (int j = 0; j < thisLimbCount; j++)
                 {
-                    direction = 1;
-                }
+                    AntMovementData thisData = limbGroups[i].movementData;
 
-                // Rotate end point to specified angle around root
-                var rot = Quaternion.AngleAxis(direction * thisData.AngularStep, transform.forward);
-                var steps = Mathf.CeilToInt(180 / Mathf.Abs(thisData.AngularStep));
+                    int direction = -1;
 
-                Gizmos.color = Color.blue;
-                // Looping through LineCasts until it finds any point
-                for (int j = 0; j < steps; j++)
-                {
-                    Vector3 linecastEndPos = rot * linecastStartPos;
-                    Gizmos.DrawLine(bodyCenter.position + linecastStartPos, bodyCenter.position + linecastEndPos);
-
-                    if (Physics2D.LinecastNonAlloc(limbTargets[i].Center.position + linecastStartPos, limbTargets[i].Center.position + linecastEndPos, results, groundLayerMask) > 0)
+                    if (antController.dir.x < 0)
                     {
-                        // Point found, exiting function
-                        _newTargetPosition = results[0].point;
-
-                        break;
+                        direction = 1;
                     }
 
-                    linecastStartPos = linecastEndPos;
+                    int limbIndex = limbGroups[i].limbTargets[j];
+                    Vector3 center = limbTargets[limbIndex].Center.up;
+                    center.x += thisData.centerPosXOffset * direction;
+
+                    // Determine start and end point for LineCast
+                    var linecastStartPos = center * thisData.RayDistance;
+
+                    // Rotate end point to specified angle around root
+                    var rot = Quaternion.AngleAxis(direction * thisData.AngularStep, transform.forward);
+                    var steps = Mathf.CeilToInt(arcDetectionLength / Mathf.Abs(thisData.AngularStep));
+
+                    Gizmos.color = Color.blue;
+                    // Looping through LineCasts until it finds any point
+                    for (int k = 0; k < steps; k++)
+                    {
+                        Vector3 linecastEndPos = rot * linecastStartPos;
+                        Gizmos.DrawLine(limbTargets[limbIndex].Center.position + linecastStartPos, 
+                            limbTargets[limbIndex].Center.position + linecastEndPos);
+
+                        linecastStartPos = linecastEndPos;
+                    }
+
+                    if (newPosTargets.Length > 0)
+                    {
+                        Gizmos.DrawWireSphere(newPosTargets[limbIndex], 0.05f);
+                    }
+
+                    Gizmos.color = Color.red;
+                    Vector3 centerPos = limbTargets[limbIndex].Center.position + new Vector3(thisData.centerPosXOffset * direction, 0);
+                    Gizmos.DrawWireSphere(centerPos, thisData.maxDistance);
+                    Gizmos.DrawWireSphere(centerPos, thisData.minDistance);
                 }
-
-                Gizmos.DrawWireSphere(_newTargetPosition, 0.05f);
-
-                Gizmos.color = Color.red;
-                Gizmos.DrawWireSphere(limbTargets[i].Center.position, thisMovementData[i].maxDistance);
-                Gizmos.DrawWireSphere(limbTargets[i].Center.position, thisMovementData[i].minDistance);
             }
+            
         }
     }
 
@@ -221,5 +274,19 @@ public class LocomotionScript : MonoBehaviour
     private void OnBecameVisible()
     {
         enabled = true;
+    }
+
+    private void OnDestroy()
+    {
+        if (limbCount > 0)
+        {
+            for (int i = 0; i < limbCount; i++)
+            {
+                if (limbTargets[i])
+                {
+                    Destroy(limbTargets[i].gameObject);
+                }
+            }
+        }
     }
 }
